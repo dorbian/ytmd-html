@@ -948,35 +948,33 @@ function initPlayer() {
     verifyAuthBtn.addEventListener('click', verifyAuthorization);
     
     // Initialize connection if we have a token
-if (player.authToken) {
-    setStatus('Verifying token...', 'connecting');
-    // First verify the token by making a simple request
-    fetch(`${BASE_URL}/state`, {
-        headers: {
-            'Authorization': player.authToken,
-            'Content-Type': 'application/json'
-        }
-    }).then(response => {
-        if (response.ok) {
-            setStatus('Connecting...', 'connecting');
-            initializeConnection();
-        } else {
-            // Token is invalid, show auth UI
+    if (player.authToken) {
+        setStatus('Verifying token...', 'connecting');
+        // First verify the token by making a simple request
+        fetch(`${BASE_URL}/state`, {
+            headers: {
+                'Authorization': player.authToken,
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            if (response.ok) {
+                setStatus('Connecting...', 'connecting');
+                initializeConnection();
+            } else {
+                // Token is invalid, show auth UI
+                player.authToken = null;
+                localStorage.removeItem('ytmAuthToken');
+                showAuthUI();
+            }
+        }).catch(() => {
+            // Network error, show auth UI
             player.authToken = null;
             localStorage.removeItem('ytmAuthToken');
-            player.isAuthorized = false;
             showAuthUI();
-        }
-    }).catch(() => {
-        // Network error, show auth UI
-        player.authToken = null;
-        localStorage.removeItem('ytmAuthToken');
-        player.isAuthorized = false;
+        });
+    } else {
         showAuthUI();
-    });
-} else {
-    showAuthUI();
-}
+    }
 }
 
 // Start the player when the page loads
