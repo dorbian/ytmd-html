@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Music Mini Player</title>
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --text-color: #333;
+            --bg-color: #f5f5f5;
+            --progress-color: var(--primary-color);
+            --progress-bg: #1e1e1e;
+            --volume-handle: var(--primary-color);
+            --volume-track: #e0e0e0;
+        }
+
+        .ytm-mini-player {
+            font-family: 'Roboto', Arial, sans-serif;
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* Player UI */
+        .player-ui {
+            transition: opacity 0.3s ease;
+        }
+
+        /* Auth UI */
+        .auth-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .connecting {
+          animation: pulse 1.5s infinite;
+          color: #ff9800;
+        }
+
+        @keyframes pulse {
+          0% { opacity: 0.6; }
+          50% { opacity: 1; }
+          100% { opacity: 0.6; }
+        }
+        .auth-ui.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .auth-code {
+            font-size: 2.5rem;
+            font-weight: bold;
+            letter-spacing: 5px;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .auth-message {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .auth-btn {
+            background: var(--primary-color);
+            color: white;
+            fill: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+
+        .auth-btn:hover {
+            background: #3367d6;
+        }
+
+        /* Progress bar and controls */
+        .progress-container {
+            position: relative;
+            height: 40px;
+            background: var(--progress-bg);
+            cursor: pointer;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--progress-color);
+            background-color: #4285f4; /* Bright blue (existing primary color) */
+            transition: width 0.1s linear;
+        }
+
+        .song-info {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            box-sizing: border-box;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #666;
+            gap: 10px;
+        }
+
+        /* Style for server info when moved */
+        .server-info {
+            color: #666;
+            opacity: 0.7;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .controls {
+            display: flex;
+            padding: 10px;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #f5f5f5;
+        }
+
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .volume-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 120px;
+        }
+
+        button {
+            background: none;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-color);
+            transition: background 0.2s;
+        }
+        /* Make background solid */
+        body {
+            background-color: #e0e0e0; /* Dark background */
+            margin: 0;
+            padding: 10px;
+        }
+
+        .ytm-mini-player {
+            background-color: #1e1e1e; /* Slightly lighter dark for player */
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        button:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        button:active {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        button svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--volume-track);
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--volume-handle);
+            cursor: pointer;
+        }
+
+        .status {
+            padding: 8px 12px;
+            font-size: 12px;
+            text-align: center;
+            color: #666;
+        }
+
+        .error {
+            color: #d32f2f;
+        }
+
+        .success {
+            color: #388e3c;
+        }
+
+        .auth-toggle {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(0,0,0,0.1);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        @media (max-width: 400px) {
+            .controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .volume-controls {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ytm-mini-player">
+        <!-- Auth toggle button -->
+        <button class="auth-toggle" id="authToggleBtn" title="Authorize">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11V11.99z" fill="White"/></svg>
+        </button>
+
+        <!-- Player UI (shown when authorized) -->
+        <div class="player-ui" id="playerUI">
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+                <div class="song-info" id="songInfo">Not connected</div>
+            </div>
+            
+            <div class="controls">
+                <div class="playback-controls">
+                    <button id="prevBtn" title="Previous">
+                        <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                    </button>
+                    <button id="playPauseBtn" title="Play/Pause">
+                        <svg viewBox="0 0 24 24" id="playPauseIcon"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                    <button id="nextBtn" title="Next">
+                        <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                    </button>
+                </div>
+                
+                <div class="volume-controls">
+                    <button id="muteBtn" title="Mute">
+                        <svg viewBox="0 0 24 24" id="volumeIcon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                    </button>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="50" title="Volume">
+                </div>
+            </div>
+            
+            <div class="status" id="connectionStatus">Disconnected</div>
+        </div>
+
+        <!-- Auth UI (shown when need authorization) -->
+        <div class="auth-ui" id="authUI">
+            <h2>Authorize Player</h2>
+            <p class="auth-message">Verify this code in YTMD:</p>
+            <div class="auth-code" id="authCode">----</div>
+            <button class="auth-btn" id="verifyAuthBtn">I've entered the code</button>
+            <p class="auth-message" id="authStatus">Waiting for authorization...</p>
+        </div>
+    </div>
+
+<script>
+// ========================
+// CONFIGURATION
+// ========================
+const SERVER_CONFIG = {
+    host: '192.168.0.3',
+    port: '9863',
+    protocol: 'http',
+    apiVersion: 'v1'
+};
+
+const BASE_URL = `${SERVER_CONFIG.protocol}://${SERVER_CONFIG.host}:${SERVER_CONFIG.port}/api/${SERVER_CONFIG.apiVersion}`;
+const WS_URL = `${SERVER_CONFIG.protocol === 'https' ? 'wss' : 'ws'}://${SERVER_CONFIG.host}:${SERVER_CONFIG.port}/api/${SERVER_CONFIG.apiVersion}/realtime`;
+
+// Rate limiting configuration
+const RATE_LIMIT_CONFIG = {
+    initialPollingInterval: 5000,
+    maxPollingInterval: 30000,
+    commandCooldown: 1000,
+    retryBaseDelay: 1000,
+    maxRetryDelay: 60000,
+    backoffFactor: 2
+};
+
+// ========================
+// PLAYER STATE
+// ========================
+const player = {
+    // Connection state
+    socket: null,
+    pollingTimer: null,
+    connectionType: null,
+    lastUpdateTime: 0,
+    retryCount: 0,
+    isConnected: false,
+    
+    // Authorization
+    authToken: localStorage.getItem('ytmAuthToken') || null,
+    authCode: null,
+    isAuthorized: false,
+    authRetries: 0,
+    maxAuthRetries: 3,
+    
+    // Player state
+    state: {
+        isPlaying: false,
+        currentTime: 0,
+        lastCurrentTime: 0,
+        duration: 0,
+        volume: 50,
+        isMuted: false,
+        currentTrack: null,
+        queue: null,
+        playlistId: null
+    },
+    
+    // UI state
+    needsUIUpdate: false,
+    
+    // Volume control
+    volumeUpdatePending: false,
+    lastVolume: 50,
+    
+    // Debug
+    debugMode: true,
+    lastCommandTime: 0
+};
+
+// DOM Elements
+const playPauseBtn = document.getElementById('playPauseBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const muteBtn = document.getElementById('muteBtn');
+const volumeSlider = document.getElementById('volumeSlider');
+const progressContainer = document.getElementById('progressContainer');
+const progressBar = document.getElementById('progressBar');
+const songInfo = document.getElementById('songInfo');
+const connectionStatus = document.getElementById('connectionStatus');
+const authUI = document.getElementById('authUI');
+const playerUI = document.getElementById('playerUI');
+const authCode = document.getElementById('authCode');
+const authToggleBtn = document.getElementById('authToggleBtn');
+const verifyAuthBtn = document.getElementById('verifyAuthBtn');
+
+// ========================
+// DEBUG UTILITIES
+// ========================
+function debugLog(message, data = null) {
+    if (player.debugMode) {
+        console.log(`[DEBUG] ${message}`, data || '');
+    }
+}
+
+function dumpStateStructure() {
+    fetch(`${BASE_URL}/state`, {
+        headers: {
+            'Authorization': player.authToken,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(state => {
+        console.log('Full state structure:', JSON.stringify(state, null, 2));
+        alert('State structure logged to console. Please check developer tools.');
+    })
+    .catch(error => {
+        console.error('Failed to fetch state:', error);
+    });
+}
+
+// ========================
+// AUTHENTICATION FLOW
+// ========================
+async function startAuthorization() {
+    try {
+        player.authRetries++;
+        setStatus('Requesting authorization code...', 'connecting');
+        
+        debugLog('Starting authorization attempt', player.authRetries);
+        const response = await fetch(`${BASE_URL}/auth/requestcode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                appId: 'ytmminiclient',
+                appName: 'YT Music Mini Client',
+                appVersion: '1.0.0'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const { code } = await response.json();
+        player.authCode = code;
+        authCode.textContent = code;
+        player.authRetries = 0;
+        setStatus('Enter this code in YouTube Music app', 'success');
+        
+        // Start verification polling
+        verifyAuthorization();
+        
+    } catch (error) {
+        console.error('Authorization failed:', error);
+        if (player.authRetries < player.maxAuthRetries) {
+            setStatus(`Authorization failed (attempt ${player.authRetries}/${player.maxAuthRetries}), retrying...`, 'error');
+            setTimeout(startAuthorization, 3000);
+        } else {
+            setStatus('Authorization failed. Please refresh the page.', 'error');
+        }
+    }
+}
+
+async function verifyAuthorization() {
+    try {
+        if (!player.authCode) {
+            throw new Error('No authorization code available');
+        }
+        
+        setStatus('Verifying authorization...', 'connecting');
+        
+        const response = await fetch(`${BASE_URL}/auth/request`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                appId: 'ytmminiclient',
+                code: player.authCode
+            })
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const { token } = await response.json();
+        player.authToken = token;
+        localStorage.setItem('ytmAuthToken', token);
+        player.isAuthorized = true;
+        
+        setStatus('Authorization successful!', 'success');
+        hideAuthUI();
+        initializeConnection();
+    } catch (error) {
+        console.error('Authorization failed:', error);
+        setStatus('Authorization failed. Please try again.', 'error');
+        
+        // Retry verification after delay if code still exists
+        if (player.authCode) {
+            setTimeout(verifyAuthorization, 3000);
+        }
+    }
+}
+
+// ========================
+// CONNECTION MANAGEMENT
+// ========================
+async function initializeConnection() {
+    try {
+        // First verify the token works by fetching state
+        const state = await fetchPlayerState();
+        updatePlayerState(state);
+        
+        // Then try WebSocket
+        debugLog('Attempting WebSocket connection');
+        await initializeWebSocket();
+        player.connectionType = 'websocket';
+        player.isConnected = true;
+        setStatus('Connected (WebSocket)', 'success');
+    } catch (error) {
+        debugLog('Initial connection failed, falling back to polling:', error);
+        setStatus('Using polling connection...', 'warning');
+        startPolling();
+        player.connectionType = 'polling';
+    }
+}
+
+async function initializeWebSocket() {
+    return new Promise((resolve, reject) => {
+        if (!player.authToken) {
+            debugLog('No auth token available for WebSocket');
+            reject(new Error('No auth token available'));
+            return;
+        }
+        
+        const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(player.authToken)}`);
+        
+        let timeout = setTimeout(() => {
+            ws.close();
+            debugLog('WebSocket connection timeout');
+            reject(new Error('WebSocket connection timeout'));
+        }, 5000);
+
+        ws.onopen = () => {
+            clearTimeout(timeout);
+            player.socket = ws;
+            debugLog('WebSocket connection established');
+            
+            ws.onmessage = (event) => {
+                try {
+                    debugLog('WebSocket message received', event.data);
+                    const data = JSON.parse(event.data);
+                    if (data.event === 'state-update') {
+                        updatePlayerState(data.data);
+                    }
+                } catch (e) {
+                    console.error('Message parse error:', e);
+                }
+            };
+            
+            ws.onclose = (event) => {
+                debugLog('WebSocket closed', event);
+                if (event.code !== 1000) {
+                    debugLog('WebSocket closed unexpectedly');
+                    handleDisconnection();
+                }
+            };
+            
+            ws.onerror = (error) => {
+                debugLog('WebSocket error', error);
+                reject(error);
+            };
+            
+            resolve();
+        };
+    });
+}
+
+function startPolling() {
+    if (player.pollingTimer) {
+        clearTimeout(player.pollingTimer);
+    }
+    
+    const interval = Math.min(
+        RATE_LIMIT_CONFIG.initialPollingInterval * Math.pow(RATE_LIMIT_CONFIG.backoffFactor, player.retryCount),
+        RATE_LIMIT_CONFIG.maxPollingInterval
+    );
+    
+    debugLog(`Starting polling with interval: ${interval}ms`);
+    
+    player.pollingTimer = setTimeout(async () => {
+        try {
+            debugLog('Polling for state update');
+            const state = await fetchPlayerState();
+            updatePlayerState(state);
+            player.retryCount = 0;
+            player.isConnected = true;
+            setStatus('Connected (polling)', 'success');
+        } catch (error) {
+            console.error('Polling error:', error);
+            player.retryCount++;
+            handleDisconnection();
+        }
+        
+        startPolling();
+    }, interval);
+}
+
+async function fetchPlayerState() {
+    debugLog('Fetching player state');
+    const response = await fetch(`${BASE_URL}/state`, {
+        headers: {
+            'Authorization': player.authToken,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    if (!response.ok) {
+        if (response.status === 401) {
+            player.isAuthorized = false;
+            player.authToken = null;
+            localStorage.removeItem('ytmAuthToken');
+            showAuthUI();
+            throw new Error('Session expired - please reauthorize');
+        }
+        throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const state = await response.json();
+    debugLog('Received state from server', state);
+    return state;
+}
+
+function handleDisconnection() {
+    debugLog('Handling disconnection');
+    player.isConnected = false;
+    setStatus('Connection lost - reconnecting...', 'error');
+    
+    if (player.socket) {
+        player.socket.close();
+        player.socket = null;
+    }
+}
+
+// ========================
+// STATE MANAGEMENT
+// ========================
+function updatePlayerState(newState) {
+    if (!newState) {
+        debugLog('updatePlayerState called with null/undefined state');
+        return;
+    }
+    
+    debugLog('Full state received from server:', newState);
+    
+    const oldIsPlaying = player.state.isPlaying;
+    const oldTrack = player.state.currentTrack?.title;
+    
+    player.state.lastCurrentTime = player.state.currentTime;
+    
+    const serverIndicatedPlaying = newState.player?.trackState === 1;
+    const progressIncreased = player.state.currentTime > player.state.lastCurrentTime;
+    const significantProgress = (player.state.currentTime - player.state.lastCurrentTime) > 0.5;
+    
+    player.state.isPlaying = serverIndicatedPlaying || 
+                           (progressIncreased && significantProgress);
+    
+    debugLog('Play state determined:', {
+        serverIndicatedPlaying,
+        progressIncreased,
+        significantProgress,
+        finalIsPlaying: player.state.isPlaying,
+        currentTime: player.state.currentTime,
+        lastCurrentTime: player.state.lastCurrentTime
+    });
+
+    player.state.currentTime = newState.player?.videoProgress || 0;
+    player.state.duration = newState.video?.durationSeconds || 0;
+    player.state.volume = newState.player?.volume || 50;
+    player.state.isMuted = newState.player?.muted || false;
+    
+    if (newState.video) {
+        player.state.currentTrack = {
+            title: newState.video.title || 'Unknown',
+            artist: newState.video.author || 'Unknown',
+            album: newState.video.album || '',
+            thumbnails: newState.video.thumbnails || []
+        };
+    }
+    
+    player.needsUIUpdate = true;
+    updateUI();
+}
+
+function updateUI() {
+    try {
+        debugLog('Updating UI. needsUIUpdate:', player.needsUIUpdate);
+        
+        updatePlayPauseIcon();
+        
+        if (player.state.duration > 0) {
+            const progress = (player.state.currentTime / player.state.duration) * 100;
+            debugLog('Updating progress bar:', progress + '%');
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        if (player.state.currentTrack) {
+            debugLog('Updating track info:', player.state.currentTrack);
+            songInfo.textContent = `${player.state.currentTrack.title} • ${player.state.currentTrack.artist}`;
+        }
+        
+        if (!player.volumeUpdatePending) {
+            debugLog('Updating volume display:', player.state.volume);
+            volumeSlider.value = player.state.volume;
+            updateVolumeIcon();
+        }
+        
+        player.needsUIUpdate = false;
+    } catch (error) {
+        console.error('UI update failed:', error);
+    }
+}
+
+function updatePlayPauseIcon() {
+    try {
+        debugLog('Updating play/pause icon. isPlaying:', player.state.isPlaying);
+        const playPauseIcon = document.querySelector('#playPauseIcon path');
+        if (!playPauseIcon) {
+            console.error('Play/Pause icon not found! Check your SVG element ID');
+            return;
+        }
+        
+        playPauseIcon.classList.remove('playing', 'paused');
+        
+        if (player.state.isPlaying) {
+            playPauseIcon.setAttribute('d', 'M6 19h4V5H6v14zm8-14v14h4V5h-4z');
+            playPauseIcon.classList.add('playing');
+            debugLog('Set icon to PAUSE');
+        } else {
+            playPauseIcon.setAttribute('d', 'M8 5v14l11-7z');
+            playPauseIcon.classList.add('paused');
+            debugLog('Set icon to PLAY');
+        }
+    } catch (error) {
+        console.error('Failed to update play/pause icon:', error);
+    }
+}
+
+function updateVolumeIcon() {
+    try {
+        debugLog('Updating volume icon. Volume:', player.state.volume, 'Muted:', player.state.isMuted);
+        const volumeIcon = document.querySelector('#volumeIcon path');
+        if (!volumeIcon) {
+            console.error('Volume icon not found!');
+            return;
+        }
+        
+        if (player.state.isMuted || player.state.volume === 0) {
+            volumeIcon.setAttribute('d', 'M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z');
+        } else if (player.state.volume < 30) {
+            volumeIcon.setAttribute('d', 'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z');
+        } else {
+            volumeIcon.setAttribute('d', 'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z');
+        }
+    } catch (error) {
+        console.error('Failed to update volume icon:', error);
+    }
+}
+
+// ========================
+// COMMAND HANDLING
+// ========================
+async function sendCommand(command) {
+    if (!player.isConnected) {
+        setStatus('Not connected', 'error');
+        return false;
+    }
+    
+    const now = Date.now();
+    if (now - player.lastCommandTime < RATE_LIMIT_CONFIG.commandCooldown) {
+        return false;
+    }
+    player.lastCommandTime = now;
+    
+    try {
+        debugLog('Sending command:', command);
+        if (player.connectionType === 'websocket' && player.socket?.readyState === WebSocket.OPEN) {
+            player.socket.send(JSON.stringify(command));
+        } else {
+            await fetch(`${BASE_URL}/command`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': player.authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(command)
+            });
+        }
+        return true;
+    } catch (error) {
+        console.error('Command failed:', error);
+        return false;
+    }
+}
+
+// ========================
+// PLAYER CONTROLS
+// ========================
+function togglePlayPause() {
+    debugLog('Toggle play/pause clicked. Current state:', player.state.isPlaying);
+    sendCommand({ command: 'playPause' });
+    player.state.isPlaying = !player.state.isPlaying;
+    updatePlayPauseIcon();
+}
+
+function playPrevious() {
+    debugLog('Previous track clicked');
+    sendCommand({ command: 'previous' });
+}
+
+function playNext() {
+    debugLog('Next track clicked');
+    sendCommand({ command: 'next' });
+}
+
+function handleVolumeChangeStart() {
+    debugLog('Volume change started');
+    player.volumeUpdatePending = true;
+    player.lastVolume = player.state.volume;
+}
+
+function handleVolumeChangeEnd() {
+    debugLog('Volume change ended');
+    if (!player.volumeUpdatePending) return;
+    
+    const newVolume = parseInt(volumeSlider.value);
+    if (newVolume !== player.lastVolume) {
+        sendCommand({ command: 'setVolume', data: newVolume });
+    }
+    player.volumeUpdatePending = false;
+}
+
+function updateVolumeDisplay() {
+    if (player.volumeUpdatePending) {
+        const newVolume = parseInt(volumeSlider.value);
+        player.state.volume = newVolume;
+        updateVolumeIcon();
+    }
+}
+
+function toggleMute() {
+    debugLog('Toggle mute clicked');
+    sendCommand({ command: player.state.isMuted ? 'unmute' : 'mute' });
+}
+
+function seekToPosition(e) {
+    debugLog('Seek to position');
+    const rect = progressContainer.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    const seekTime = pos * player.state.duration;
+    sendCommand({ command: 'seekTo', data: seekTime });
+}
+
+// ========================
+// UI MANAGEMENT
+// ========================
+function setStatus(message, type = '') {
+    connectionStatus.textContent = message;
+    connectionStatus.className = type;
+}
+
+function toggleAuthUI() {
+    if (authUI.classList.contains('active')) {
+        hideAuthUI();
+    } else {
+        showAuthUI();
+    }
+}
+
+function showAuthUI() {
+    authUI.classList.add('active');
+    playerUI.style.opacity = '0.5';
+    playerUI.style.pointerEvents = 'none';
+    
+    if (!player.isAuthorized) {
+        startAuthorization();
+    }
+}
+
+function hideAuthUI() {
+    authUI.classList.remove('active');
+    playerUI.style.opacity = '1';
+    playerUI.style.pointerEvents = 'all';
+}
+
+// ========================
+// INITIALIZATION
+// ========================
+function initPlayer() {
+    debugLog('Initializing player');
+    
+    // Make background translucent
+    document.body.style.backgroundColor = 'rgba(0,0,0,0.1)';
+    
+    // Add debug button to inspect state structure
+    // const debugBtn = document.createElement('button');
+    // debugBtn.textContent = 'Debug State';
+    // debugBtn.style.position = 'fixed';
+    // debugBtn.style.bottom = '10px';
+    // debugBtn.style.right = '10px';
+    // debugBtn.style.zIndex = '1000';
+    // debugBtn.style.padding = '5px 10px';
+    // debugBtn.style.backgroundColor = '#ff5722';
+    // debugBtn.style.color = 'white';
+    // debugBtn.style.border = 'none';
+    // debugBtn.style.borderRadius = '4px';
+    // debugBtn.style.cursor = 'pointer';
+    // debugBtn.onclick = dumpStateStructure;
+    // document.body.appendChild(debugBtn);
+    
+    // Add server connection info display
+    const serverInfo = document.createElement('span');
+    serverInfo.className = 'server-info';
+    serverInfo.textContent = `${SERVER_CONFIG.host}:${SERVER_CONFIG.port}`;
+    
+    // Setup event listeners
+    playPauseBtn.addEventListener('click', togglePlayPause);
+    prevBtn.addEventListener('click', playPrevious);
+    nextBtn.addEventListener('click', playNext);
+    
+    connectionStatus.appendChild(serverInfo);
+
+    // Volume control
+    volumeSlider.addEventListener('mousedown', handleVolumeChangeStart);
+    volumeSlider.addEventListener('mouseup', handleVolumeChangeEnd);
+    volumeSlider.addEventListener('touchstart', handleVolumeChangeStart, { passive: true });
+    volumeSlider.addEventListener('touchend', handleVolumeChangeEnd);
+    volumeSlider.addEventListener('input', updateVolumeDisplay);
+    
+    muteBtn.addEventListener('click', toggleMute);
+    progressContainer.addEventListener('click', seekToPosition);
+    authToggleBtn.addEventListener('click', toggleAuthUI);
+    verifyAuthBtn.addEventListener('click', verifyAuthorization);
+    
+    // Initialize connection if we have a token
+if (player.authToken) {
+    setStatus('Verifying token...', 'connecting');
+    // First verify the token by making a simple request
+    fetch(`${BASE_URL}/state`, {
+        headers: {
+            'Authorization': player.authToken,
+            'Content-Type': 'application/json'
+        }
+    }).then(response => {
+        if (response.ok) {
+            setStatus('Connecting...', 'connecting');
+            initializeConnection();
+        } else {
+            // Token is invalid, show auth UI
+            player.authToken = null;
+            localStorage.removeItem('ytmAuthToken');
+            player.isAuthorized = false;
+            showAuthUI();
+        }
+    }).catch(() => {
+        // Network error, show auth UI
+        player.authToken = null;
+        localStorage.removeItem('ytmAuthToken');
+        player.isAuthorized = false;
+        showAuthUI();
+    });
+} else {
+    showAuthUI();
+}
+}
+
+// Start the player when the page loads
+window.addEventListener('DOMContentLoaded', initPlayer);
+</script>
+</body>
+</html>
