@@ -316,15 +316,23 @@
         </div>
     </div>
 
+<script src="ytmd-config.js"></script>
 <script>
 // ========================
 // CONFIGURATION
 // ========================
-const SERVER_CONFIG = {
+const DEFAULT_SERVER_CONFIG = {
     host: '192.168.0.3',
     port: '9863',
     protocol: 'http',
     apiVersion: 'v1'
+};
+
+const SERVER_CONFIG = {
+    host: (window.YTMD_CONFIG && window.YTMD_CONFIG.host) || DEFAULT_SERVER_CONFIG.host,
+    port: (window.YTMD_CONFIG && window.YTMD_CONFIG.port) || DEFAULT_SERVER_CONFIG.port,
+    protocol: (window.YTMD_CONFIG && window.YTMD_CONFIG.protocol) || DEFAULT_SERVER_CONFIG.protocol,
+    apiVersion: (window.YTMD_CONFIG && window.YTMD_CONFIG.apiVersion) || DEFAULT_SERVER_CONFIG.apiVersion
 };
 
 const BASE_URL = `${SERVER_CONFIG.protocol}://${SERVER_CONFIG.host}:${SERVER_CONFIG.port}/api/${SERVER_CONFIG.apiVersion}`;
